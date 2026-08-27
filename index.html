@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>The Star Brisbane - Blackjack Challenge 模擬器 v3</title>
+  <style>
+    :root{--bg:#f5f6f8;--card:#fff;--text:#1f2937;--muted:#6b7280;--border:#d6d9df;--accent:#2563eb;--good:#15803d;--bad:#b91c1c;--warn:#a16207}
+    *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC",sans-serif}
+    .wrap{max-width:1000px;margin:0 auto;padding:18px}.grid{display:grid;gap:12px}.stats{grid-template-columns:repeat(auto-fit,minmax(145px,1fr))}
+    .panel{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px}.label{font-size:12px;color:var(--muted)}.big{font-size:23px;font-weight:750;margin-top:4px}
+    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:end} label{font-size:13px;color:var(--muted)} input,button{font:inherit;border:1px solid var(--border);border-radius:10px;padding:10px 12px;background:#fff;color:var(--text)} input{display:block;margin-top:5px;min-width:130px} button{cursor:pointer} button.primary{background:var(--accent);color:#fff;border-color:var(--accent)} button:disabled{opacity:.42;cursor:not-allowed}
+    .table{display:grid;gap:18px}.hand-title{font-weight:700;margin-bottom:8px}.cards{display:flex;gap:8px;flex-wrap:wrap}.playing-card{width:58px;height:82px;border:1px solid var(--border);border-radius:10px;background:#fff;padding:8px;display:flex;flex-direction:column;justify-content:space-between;font-weight:750}.red{color:#dc2626}
+    .actions{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.actions button{min-height:48px;font-weight:700}.feedback{padding:12px;border-radius:10px;border:1px solid var(--border);background:#fafafa;line-height:1.55}.good{color:var(--good);font-weight:750}.bad{color:var(--bad);font-weight:750}.warn{color:var(--warn);font-weight:750}.small{font-size:13px;color:var(--muted);line-height:1.6}.history{max-height:280px;overflow:auto;border-top:1px solid var(--border);margin-top:10px;padding-top:6px}.hist-item{padding:7px 0;border-bottom:1px dashed #e5e7eb;font-size:13px}.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.chip{font-size:12px;border:1px solid var(--border);border-radius:999px;padding:4px 8px;background:#fafafa}.decision-log{display:grid;gap:9px}.decision-item{border:1px solid var(--border);border-radius:11px;padding:10px;background:#fafafa}.decision-head{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:6px}.decision-title{font-weight:750}.decision-detail{font-size:13px;color:var(--muted);line-height:1.6}
+    @media(max-width:620px){.wrap{padding:10px}.actions{grid-template-columns:repeat(2,1fr)}}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Blackjack Challenge 策略練習器 v3</h1>
+  <div class="small" style="margin-bottom:16px">新版：每一次操作都會保留「你選了什麼、是否正確、最佳策略與原理」，不只顯示第一步；並保留正確爆牌率、Five Card Trick、本金、盈虧、ROI、勝率與策略正確率。</div>
+
+  <div class="grid stats">
+    <div class="panel"><div class="label">目前本金</div><div id="bankroll" class="big">$500.00</div></div>
+    <div class="panel"><div class="label">累積盈虧</div><div id="profit" class="big">$0.00</div></div>
+    <div class="panel"><div class="label">ROI</div><div id="roi" class="big">0.00%</div></div>
+    <div class="panel"><div class="label">目前勝率</div><div id="winRate" class="big">—</div></div>
+    <div class="panel"><div class="label">策略正確率</div><div id="accuracy" class="big">—</div></div>
+    <div class="panel"><div class="label">累積下注</div><div id="totalWagered" class="big">$0.00</div></div>
+  </div>
+
+  <div class="panel" style="margin-top:12px">
+    <div class="row">
+      <label>初始本金<input id="startBankroll" type="number" min="1" step="1" value="500"></label>
+      <label>每局主注<input id="baseBet" type="number" min="1" step="1" value="10"></label>
+      <button id="resetAll" type="button">重設全部</button>
+      <button id="newRound" class="primary" type="button">發新牌</button>
+    </div>
+    <div class="small" style="margin-top:8px">Double 會再加同額下注；Split 會新增一手同額下注。普通勝利 1:1；Player 21 / Five Card Trick 1:1；Blackjack 一般 2:1。平手玩家輸。</div>
+  </div>
+
+  <div class="panel" style="margin-top:12px">
+    <div class="table">
+      <div><div class="hand-title">Dealer</div><div id="dealerCards" class="cards"></div></div>
+      <div>
+        <div class="row" style="justify-content:space-between;align-items:center"><div class="hand-title">你的牌 <span id="handCounter"></span></div><div id="handTotal" style="font-weight:750"></div></div>
+        <div id="playerCards" class="cards"></div><div id="handBet" class="small" style="margin-top:8px"></div>
+      </div>
+      <div id="feedback" class="feedback" aria-live="polite">按「發新牌」開始。</div>
+      <div class="actions">
+        <button data-action="H" type="button">Hit 補牌</button><button data-action="S" type="button">Stand 停牌</button><button data-action="D" type="button">Double 加倍</button><button data-action="P" type="button">Split 分牌</button>
+      </div>
+      <div><div class="hand-title">策略原理</div><div id="explanation" class="small">發牌後會顯示推薦動作、立即爆牌率、Dealer 爆牌率、以及安全／爆牌牌值。</div><div id="riskChips" class="chips"></div></div>
+    </div>
+  </div>
+
+  <div class="panel" style="margin-top:12px">
+    <div class="hand-title">本局每一步策略紀錄</div>
+    <div id="decisionLog" class="decision-log"><div class="small">每次按 Hit / Stand / Double / Split 後，都會保留這一步的判定與策略原理。</div></div>
+  </div>
+
+  <div class="panel" style="margin-top:12px"><div class="hand-title">統計</div><div id="summary" class="small"></div><div class="history" id="history"></div></div>
+</div>
+
+<script>
+(() => {
+  const ranks=['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
+  const suits=['♠','♥','♦','♣'];
+  const rankWeights=[{label:'A',value:1,weight:1},{label:'2',value:2,weight:1},{label:'3',value:3,weight:1},{label:'4',value:4,weight:1},{label:'5',value:5,weight:1},{label:'6',value:6,weight:1},{label:'7',value:7,weight:1},{label:'8',value:8,weight:1},{label:'9',value:9,weight:1},{label:'10/J/Q/K',value:10,weight:4}];
+  let shoe=[],dealer=[],hands=[],current=0,splitCount=0,roundOpen=false,roundDecisionStep=0;
+  let stats={startBankroll:500,bankroll:500,profit:0,totalWagered:0,wins:0,losses:0,hands:0,correct:0,decisions:0};
+  const $=id=>document.getElementById(id);
+  const els={bankroll:$('bankroll'),profit:$('profit'),roi:$('roi'),winRate:$('winRate'),accuracy:$('accuracy'),totalWagered:$('totalWagered'),startBankroll:$('startBankroll'),baseBet:$('baseBet'),resetAll:$('resetAll'),newRound:$('newRound'),dealerCards:$('dealerCards'),playerCards:$('playerCards'),handCounter:$('handCounter'),handTotal:$('handTotal'),handBet:$('handBet'),feedback:$('feedback'),explanation:$('explanation'),riskChips:$('riskChips'),summary:$('summary'),history:$('history'),decisionLog:$('decisionLog'),actionButtons:[...document.querySelectorAll('[data-action]')]};
+
+  function newShoe(){shoe=[];for(let d=0;d<6;d++)for(const s of suits)for(const r of ranks)shoe.push({r,s});for(let i=shoe.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[shoe[i],shoe[j]]=[shoe[j],shoe[i]];}}
+  function draw(){if(shoe.length<78)newShoe();return shoe.pop();}
+  function rawCardValue(c){if(c.r==='A')return 11;if(['10','J','Q','K'].includes(c.r))return 10;return Number(c.r);}
+  function handInfo(cards){let total=cards.reduce((a,c)=>a+rawCardValue(c),0);let aces=cards.filter(c=>c.r==='A').length;while(total>21&&aces>0){total-=10;aces--;}const raw=cards.reduce((a,c)=>a+rawCardValue(c),0);return {total,soft:cards.some(c=>c.r==='A')&&raw===total&&total<=21};}
+  function dealerKey(){const r=dealer[0].r;if(r==='A')return 'A';if(['10','J','Q','K'].includes(r))return 10;return Number(r);}
+  function sameValuePair(cards){return cards.length===2&&rawCardValue(cards[0])===rawCardValue(cards[1]);}
+  function pairGroup(c){if(c.r==='A')return'A';if(['10','J','Q','K'].includes(c.r))return'T';return c.r;}
+  function isBlackjack(cards){return cards.length===2&&cards.some(c=>c.r==='A')&&cards.some(c=>rawCardValue(c)===10);}
+  function bjTenRank(card){if(card.r==='K')return 4;if(card.r==='Q')return 3;if(card.r==='J')return 2;if(card.r==='10')return 1;return 0;}
+  function blackjackTenCard(cards){return cards.find(c=>c.r!=='A');}
+
+  function hitRisk(cards){
+    const info=handInfo(cards);
+    if(info.soft||info.total<=11)return {rate:0,safe:['A','2','3','4','5','6','7','8','9','10/J/Q/K'],bust:[]};
+    let bustWeight=0;const safe=[],bust=[];
+    for(const r of rankWeights){if(info.total+r.value>21){bustWeight+=r.weight;bust.push(r.label);}else safe.push(r.label);}
+    return {rate:bustWeight/13,safe,bust};
+  }
+
+  const dealerBustApprox={2:.35,3:.37,4:.40,5:.42,6:.42,7:.26,8:.24,9:.23,10:.21,A:.12};
+
+  function pairAction(cards,d){const g=pairGroup(cards[0]);if(g==='A')return'P';if(g==='2')return(d!=='A'&&d>=4&&d<=7)?'P':'H';if(g==='3')return(d!=='A'&&d>=3&&d<=7)?'P':'H';if(g==='4')return'H';if(g==='5')return(d!=='A'&&d<=9)?'D':'H';if(g==='6')return(d!=='A'&&d<=6)?'P':'H';if(g==='7')return(d!=='A'&&d<=7)?'P':'H';if(g==='8')return'P';if(g==='9')return[2,3,4,5,6,8,9].includes(d)?'P':'S';if(g==='T')return d===7?'P':'S';return'H';}
+
+  function strategy(cards,d){
+    const info=handInfo(cards),t=info.total;
+    if(cards.length===2&&sameValuePair(cards))return pairAction(cards,d);
+    if(cards.length===4){if(info.soft&&t<=20)return'H';if(t<=15)return'H';if(t===16)return[4,5,6].includes(d)?'S':'H';if(t===17)return[2,3,4,5,6].includes(d)?'S':'H';return'S';}
+    if(cards.length===3&&!info.soft){if(t<=9)return'H';if(t===10)return[3,4,5,6].includes(d)?'D':'H';if(t===11)return[2,3,4,5,6].includes(d)?'D':'H';if(t===12)return'H';if(t===13)return[3,4,5,6].includes(d)?'S':'H';if(t===14)return[2,3,4,5,6].includes(d)?'S':'H';if(t===15||t===16)return[2,3,4,5,6,10].includes(d)?'S':'H';if(t===17)return d==='A'?'H':'S';return'S';}
+    if(info.soft){if(t<=15)return'H';if(t===16)return[5,6].includes(d)?'D':'H';if(t===17)return[4,5,6].includes(d)?'D':'H';if(t===18){if([3,4,5,6].includes(d))return'D';if([7,8].includes(d))return'S';return'H';}return'S';}
+    if(t<=8)return'H';if(t===9)return[4,5,6].includes(d)?'D':'H';if(t===10)return(d!=='A'&&d<=9)?'D':'H';if(t===11)return d==='A'?'H':'D';if(t===12)return[4,5,6].includes(d)?'S':'H';if(t===13||t===14)return[2,3,4,5,6].includes(d)?'S':'H';if(t===15||t===16)return[2,3,4,5,6,10].includes(d)?'S':'H';if(t===17)return[2,3,4,5,6,7,10].includes(d)?'S':'H';return'S';
+  }
+
+  function actionName(a){return({H:'Hit 補牌',S:'Stand 停牌',D:'Double 加倍',P:'Split 分牌'})[a];}
+  function cardHtml(c){const red=(c.s==='♥'||c.s==='♦')?' red':'';return `<div class="playing-card${red}"><span>${c.r}</span><span style="font-size:22px;align-self:flex-end">${c.s}</span></div>`;}
+  function money(n){return'$'+n.toFixed(2);}
+  function updateStats(){stats.profit=stats.bankroll-stats.startBankroll;els.bankroll.textContent=money(stats.bankroll);els.profit.textContent=(stats.profit>=0?'+':'')+money(stats.profit);els.profit.className='big '+(stats.profit>0?'good':stats.profit<0?'bad':'');const roi=stats.startBankroll>0?stats.profit/stats.startBankroll*100:0;els.roi.textContent=roi.toFixed(2)+'%';els.winRate.textContent=stats.hands?(stats.wins/stats.hands*100).toFixed(1)+'%':'—';els.accuracy.textContent=stats.decisions?(stats.correct/stats.decisions*100).toFixed(1)+'%':'—';els.totalWagered.textContent=money(stats.totalWagered);els.summary.textContent=`${stats.wins} 勝 / ${stats.losses} 負 / ${stats.hands} 手；策略正確 ${stats.correct}/${stats.decisions} 次。`;}
+
+  function explain(cards,d,opt){
+    const info=handInfo(cards),risk=hitRisk(cards);const br=(risk.rate*100).toFixed(1),db=((dealerBustApprox[d]||0)*100).toFixed(0);
+    let msg=`目前 ${info.soft?'Soft':'Hard'} ${info.total}。如果 Hit 一張，立即爆牌率約 ${br}%。Dealer ${d} 的最終爆牌率約 ${db}%（近似值）。`;
+    if(cards.length===4)msg+=` 你已經有 4 張牌：下一張只要不爆，就會直接觸發 Five Card Trick 自動獲勝。`;
+    if(opt==='H')msg+=` 建議 Hit：目前停牌競爭力不足，或第 5 張不爆的自動勝價值夠高，因此補牌的長期期望較好。`;
+    if(opt==='S')msg+=` 建議 Stand：繼續補牌的立即死亡風險，或成功補牌後的額外價值，不如讓 Dealer 繼續完成手牌。`;
+    if(opt==='D')msg+=` 建議 Double：這手只拿一張形成強牌的機率高，值得用額外下注放大優勢。`;
+    if(opt==='P')msg+=` 建議 Split：把目前這一對拆成兩個新起點，長期期望高於保留原手牌。`;
+    if((info.total===15||info.total===16)&&(d===9||d===10))msg+=` 注意：同一總點數對 Dealer 9 或 10，你自己的爆牌率完全相同；差別在 Dealer 最終點數分布、平手玩家輸，以及你成功補到 17–20 後的實際價值。`;
+    return msg;
+  }
+
+  function renderRisk(cards){const r=hitRisk(cards);const safeText=r.safe.length?`安全牌值：${r.safe.join('、')}`:'沒有安全牌';const bustText=r.bust.length?`爆牌牌值：${r.bust.join('、')}`:'不會立即爆牌';els.riskChips.innerHTML=`<span class="chip">${safeText}</span><span class="chip">${bustText}</span>`;}
+  function cardsText(cards){return cards.map(c=>`${c.r}${c.s}`).join(' ');} 
+  function addDecisionLog(snapshot, action, opt, correct){
+    const item=document.createElement('div');
+    item.className='decision-item';
+    const risk=hitRisk(snapshot.cards);
+    const info=handInfo(snapshot.cards);
+    const verdict=correct?'<span class="good">✅ 策略正確</span>':'<span class="bad">❌ 策略錯誤</span>';
+    const reason=explain(snapshot.cards,snapshot.dealer,opt);
+    const safe=risk.safe.length?risk.safe.join('、'):'無';
+    const bust=risk.bust.length?risk.bust.join('、'):'無';
+    item.innerHTML=`<div class="decision-head"><span class="decision-title">第 ${snapshot.step} 次操作</span><span>手牌 ${snapshot.handNo}/${snapshot.handCount}</span>${verdict}</div>`+
+      `<div class="decision-detail">操作前：${cardsText(snapshot.cards)}（${info.soft?'Soft':'Hard'} ${info.total}）｜Dealer ${snapshot.dealer}｜你選 <strong>${actionName(action)}</strong>｜最佳策略 <strong>${actionName(opt)}</strong></div>`+
+      `<div class="decision-detail">${reason}</div>`+
+      `<div class="decision-detail">安全牌值：${safe}｜爆牌牌值：${bust}</div>`;
+    els.decisionLog.appendChild(item);
+  }
+  function validActions(){if(!roundOpen||!hands[current]||hands[current].done)return[];const h=hands[current],out=['H','S'];if((h.cards.length===2||h.cards.length===3)&&stats.bankroll>=h.bet)out.push('D');if(h.cards.length===2&&sameValuePair(h.cards)&&splitCount<2&&stats.bankroll>=h.bet)out.push('P');return out;}
+  function render(){els.dealerCards.innerHTML=dealer.map(cardHtml).join('');const h=hands[current];if(h){els.playerCards.innerHTML=h.cards.map(cardHtml).join('');const info=handInfo(h.cards);els.handTotal.textContent=`${info.soft?'Soft ':'Hard '}${info.total}`;els.handCounter.textContent=hands.length>1?`(${current+1}/${hands.length})`:'';els.handBet.textContent=`本手下注：${money(h.bet)}`;if(!h.done&&roundOpen){const opt=strategy(h.cards,dealerKey());els.explanation.textContent=explain(h.cards,dealerKey(),opt);renderRisk(h.cards);}}else els.riskChips.innerHTML='';const valid=validActions();els.actionButtons.forEach(b=>b.disabled=!valid.includes(b.dataset.action));updateStats();}
+  function logHistory(text){const div=document.createElement('div');div.className='hist-item';div.textContent=text;els.history.prepend(div);}
+  function chargeBet(amount){stats.bankroll-=amount;stats.totalWagered+=amount;}
+
+  function startRound(){
+    if(roundOpen){els.feedback.innerHTML='<span class="warn">目前這局還沒結束。</span>';return;}
+    const bet=Math.max(1,Number(els.baseBet.value)||10);if(stats.bankroll<bet){els.feedback.innerHTML='<span class="bad">本金不足，請降低下注或重設。</span>';return;}
+    chargeBet(bet);if(shoe.length<78)newShoe();dealer=[draw()];hands=[{cards:[draw(),draw()],bet,done:false,result:null,isSplit:false}];current=0;splitCount=0;roundDecisionStep=0;roundOpen=true;els.feedback.textContent='請選擇動作。';els.decisionLog.innerHTML='<div class="small">本局尚未操作。</div>';
+    if(isBlackjack(hands[0].cards)){hands[0].done=true;hands[0].result='blackjack';finishRound();return;}
+    if(handInfo(hands[0].cards).total===21){hands[0].done=true;hands[0].result='win';finishRound();return;}
+    render();
+  }
+
+  function nextHand(){while(current<hands.length&&hands[current].done)current++;if(current>=hands.length)finishRound();else render();}
+  function settleDealer(){while(handInfo(dealer).total<17)dealer.push(draw());}
+
+  function resolveBlackjackPayout(playerCards,dealerCards,bet){
+    if(!isBlackjack(dealerCards))return{returnAmount:bet*3,profit:bet*2,label:`Blackjack +${money(bet*2)}`};
+    const pRank=bjTenRank(blackjackTenCard(playerCards)),dRank=bjTenRank(blackjackTenCard(dealerCards));let odds=4;if(pRank>dRank)odds=5;if(pRank<dRank)odds=3;return{returnAmount:bet*(1+odds),profit:bet*odds,label:`BJ 對 BJ，${odds}:1 +${money(bet*odds)}`};
+  }
+
+  function finishRound(){
+    settleDealer();const dTotal=handInfo(dealer).total;let resultWords=[];
+    for(const h of hands){
+      if(!h.result){const p=handInfo(h.cards).total;if(p>21)h.result='loss';else if(dTotal>21)h.result='win';else if(p>dTotal)h.result='win';else h.result='loss';}
+      stats.hands++;
+      if(h.result==='blackjack'){stats.wins++;const pay=resolveBlackjackPayout(h.cards,dealer,h.bet);stats.bankroll+=pay.returnAmount;resultWords.push(pay.label);}else if(h.result==='win'){stats.wins++;stats.bankroll+=h.bet*2;resultWords.push(`勝 +${money(h.bet)}`);}else{stats.losses++;resultWords.push(`負 -${money(h.bet)}`);}
+    }
+    roundOpen=false;current=Math.max(0,hands.length-1);const dealerText=dTotal>21?`Dealer 爆牌 (${dTotal})`:`Dealer ${dTotal}`;els.feedback.innerHTML=`本局結束：<strong>${resultWords.join(' / ')}</strong>；${dealerText}`;logHistory(`${new Date().toLocaleTimeString()}｜${resultWords.join(' / ')}｜${dealerText}`);render();
+  }
+
+  function choose(action){
+    if(!roundOpen)return;const h=hands[current],d=dealerKey(),opt=strategy(h.cards,d),valid=validActions();if(!valid.includes(action))return;
+    const snapshot={cards:h.cards.map(c=>({...c})),dealer:d,handNo:current+1,handCount:hands.length,step:++roundDecisionStep};
+    stats.decisions++;const correct=action===opt;if(correct)stats.correct++;
+    if(roundDecisionStep===1 && els.decisionLog.querySelector('.small')) els.decisionLog.innerHTML='';
+    addDecisionLog(snapshot,action,opt,correct);
+    els.feedback.innerHTML=`${correct?'<span class="good">✅ 正確</span>':'<span class="bad">❌ 不是最佳策略</span>'}｜你選 ${actionName(action)}；建議：<strong>${actionName(opt)}</strong><br><span class="small">這一步已加入下方「本局每一步策略紀錄」。下一次操作也會另外判定。</span>`;
+    if(action==='H'){h.cards.push(draw());const info=handInfo(h.cards);if(info.total>21){h.done=true;h.result='loss';}else if(info.total===21||h.cards.length===5){h.done=true;h.result='win';}}
+    if(action==='S')h.done=true;
+    if(action==='D'){chargeBet(h.bet);h.bet*=2;h.cards.push(draw());const info=handInfo(h.cards);h.done=true;if(info.total>21)h.result='loss';else if(info.total===21||h.cards.length===5)h.result='win';}
+    if(action==='P'){chargeBet(h.bet);const c1=h.cards[0],c2=h.cards[1];const h1={cards:[c1,draw()],bet:h.bet,done:false,result:null,isSplit:true},h2={cards:[c2,draw()],bet:h.bet,done:false,result:null,isSplit:true};hands.splice(current,1,h1,h2);splitCount++;for(const x of [h1,h2]){if(isBlackjack(x.cards)){x.done=true;x.result='blackjack';}else if(handInfo(x.cards).total===21){x.done=true;x.result='win';}}}
+    if(hands[current]&&!hands[current].done)render();else nextHand();
+  }
+
+  function resetAll(){const start=Math.max(1,Number(els.startBankroll.value)||500);stats={startBankroll:start,bankroll:start,profit:0,totalWagered:0,wins:0,losses:0,hands:0,correct:0,decisions:0};dealer=[];hands=[];current=0;splitCount=0;roundDecisionStep=0;roundOpen=false;els.dealerCards.innerHTML='';els.playerCards.innerHTML='';els.handTotal.textContent='';els.handBet.textContent='';els.handCounter.textContent='';els.feedback.textContent='已重設。按「發新牌」開始。';els.explanation.textContent='發牌後會顯示策略原理。';els.riskChips.innerHTML='';els.history.innerHTML='';els.decisionLog.innerHTML='<div class="small">每次按 Hit / Stand / Double / Split 後，都會保留這一步的判定與策略原理。</div>';newShoe();render();}
+
+  els.actionButtons.forEach(b=>b.addEventListener('click',()=>choose(b.dataset.action)));els.newRound.addEventListener('click',startRound);els.resetAll.addEventListener('click',resetAll);newShoe();resetAll();
+})();
+</script>
+</body>
+</html>
