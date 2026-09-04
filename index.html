@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Blackjack Challenge Trainer v4</title>
+<title>Blackjack Challenge Trainer v5</title>
 <style>
 :root{--bg:#f5f6f8;--card:#fff;--text:#1f2937;--muted:#6b7280;--border:#d6d9df;--accent:#2563eb;--good:#15803d;--bad:#b91c1c;--warn:#a16207}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC",sans-serif}.wrap{max-width:1050px;margin:0 auto;padding:16px}.panel{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;margin-top:12px}.grid{display:grid;gap:10px}.stats{grid-template-columns:repeat(auto-fit,minmax(145px,1fr))}.label{font-size:12px;color:var(--muted)}.big{font-size:22px;font-weight:750}.row{display:flex;gap:10px;flex-wrap:wrap;align-items:end}input,button{font:inherit;border:1px solid var(--border);border-radius:10px;padding:10px 12px;background:#fff;color:var(--text)}button{cursor:pointer}button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}button:disabled{opacity:.45;cursor:not-allowed}.cards{display:flex;gap:8px;flex-wrap:wrap}.pcard{width:58px;height:82px;border:1px solid var(--border);border-radius:10px;background:#fff;padding:8px;display:flex;flex-direction:column;justify-content:space-between;font-weight:750}.red{color:#dc2626}.actions{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.actions button{min-height:48px;font-weight:700}.small{font-size:13px;color:var(--muted);line-height:1.55}.feedback{padding:12px;border:1px solid var(--border);border-radius:10px;background:#fafafa;line-height:1.5}.good{color:var(--good);font-weight:750}.bad{color:var(--bad);font-weight:750}.warn{color:var(--warn);font-weight:750}.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.chip{font-size:12px;border:1px solid var(--border);border-radius:999px;padding:4px 8px;background:#fafafa}.probgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:8px;margin-top:10px}.metric{border:1px solid var(--border);border-radius:10px;padding:10px}.metric b{display:block;font-size:16px;margin-top:2px}.history{max-height:360px;overflow:auto}.hist{padding:10px 0;border-bottom:1px dashed #e5e7eb;font-size:13px;line-height:1.5}.evtable{width:100%;border-collapse:collapse;margin-top:10px;font-size:13px}.evtable th,.evtable td{padding:7px;border-bottom:1px solid #e5e7eb;text-align:left}.best{font-weight:750}.muted{color:var(--muted)}
@@ -12,8 +12,8 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Blackjack Challenge 策略練習器 v4</h1>
-  <div class="small">新增：每一步的策略原理、爆牌率、Dealer 爆牌率、各動作 Monte Carlo 估算勝率／敗率／EV，並把當時分析寫入操作紀錄。EV 為近似值，每次會有小幅波動。</div>
+  <h1>Blackjack Challenge 策略練習器 v5</h1>
+  <div class="small">v5：套用最新版完整策略（2/3/4 張 Hard、Soft、Pair/Split），並保留每一步策略原理、爆牌率、Dealer 爆牌率、Monte Carlo 勝率／敗率／EV 與操作紀錄。EV 為近似值，每次會有小幅波動。</div>
 
   <div class="grid stats panel">
     <div><div class="label">目前本金</div><div id="bankroll" class="big">$500.00</div></div>
@@ -81,15 +81,88 @@ function pair(cs){return cs.length===2&&cv(cs[0])===cv(cs[1])}
 function pg(c){return c.r==='A'?'A':(['10','J','Q','K'].includes(c.r)?'T':c.r)}
 function bj(cs){return cs.length===2&&cs.some(c=>c.r==='A')&&cs.some(c=>cv(c)===10)}
 function actName(a){return({H:'Hit',S:'Stand',D:'Double',P:'Split'})[a]}
-function pairAction(cs,d){const g=pg(cs[0]);if(g==='A')return'P';if(g==='2')return(d!=='A'&&d>=4&&d<=7)?'P':'H';if(g==='3')return(d!=='A'&&d>=3&&d<=7)?'P':'H';if(g==='4')return'H';if(g==='5')return(d!=='A'&&d<=9)?'D':'H';if(g==='6')return(d!=='A'&&d<=6)?'P':'H';if(g==='7')return(d!=='A'&&d<=7)?'P':'H';if(g==='8')return'P';if(g==='9')return[2,3,4,5,6,8,9].includes(d)?'P':'S';if(g==='T')return d===7?'P':'S';return'H'}
-function strategy(cs,d){const x=info(cs),t=x.total;if(cs.length===2&&pair(cs))return pairAction(cs,d);if(cs.length===4){if(x.soft&&t<=20)return'H';if(t<=15)return'H';if(t===16)return[4,5,6].includes(d)?'S':'H';if(t===17)return[2,3,4,5,6].includes(d)?'S':'H';return'S'}if(cs.length===3&&!x.soft){if(t<=9)return'H';if(t===10)return[3,4,5,6].includes(d)?'D':'H';if(t===11)return[2,3,4,5,6].includes(d)?'D':'H';if(t===12)return'H';if(t===13)return[3,4,5,6].includes(d)?'S':'H';if(t===14)return[2,3,4,5,6].includes(d)?'S':'H';if(t===15||t===16)return[2,3,4,5,6,10].includes(d)?'S':'H';if(t===17)return d==='A'?'H':'S';return'S'}if(x.soft){if(t<=15)return'H';if(t===16)return[5,6].includes(d)?'D':'H';if(t===17)return[4,5,6].includes(d)?'D':'H';if(t===18){if([3,4,5,6].includes(d))return'D';if([7,8].includes(d))return'S';return'H'}return'S'}if(t<=8)return'H';if(t===9)return[4,5,6].includes(d)?'D':'H';if(t===10)return(d!=='A'&&d<=9)?'D':'H';if(t===11)return d==='A'?'H':'D';if(t===12)return[4,5,6].includes(d)?'S':'H';if(t===13||t===14)return[2,3,4,5,6].includes(d)?'S':'H';if(t===15||t===16)return[2,3,4,5,6,10].includes(d)?'S':'H';if(t===17)return[2,3,4,5,6,7,10].includes(d)?'S':'H';return'S'}
+function pairAction(cs,d){
+  const g=pg(cs[0]);
+  if(g==='A')return'P';
+  if(g==='2')return[5,6].includes(d)?'P':'H';
+  if(g==='3')return[4,5,6].includes(d)?'P':'H';
+  if(g==='4')return d===6?'P':'H';
+  if(g==='5')return(d!=='A'&&d>=2&&d<=8)?'D':'H';
+  if(g==='6')return[2,3,4,5,6].includes(d)?'P':'H';
+  if(g==='7')return[3,4,5,6].includes(d)?'P':'H';
+  if(g==='8'){if(d==='A')return'H';if(d===9||d===10)return'S';return'P';}
+  if(g==='9')return[2,3,4,5,6,8].includes(d)?'P':'S';
+  if(g==='T')return d===6?'P':'S';
+  return'H';
+}
+function strategy(cs,d){
+  const x=info(cs),t=x.total,n=cs.length;
+  if(n===2&&pair(cs))return pairAction(cs,d);
+
+  // 4-card strategy
+  if(n===4){
+    if(x.soft&&t<=20)return'H';
+    if(t<=15)return'H';
+    if(t===16)return[4,5,6].includes(d)?'S':'H';
+    if(t===17)return[2,3,4,5,6].includes(d)?'S':'H';
+    return'S';
+  }
+
+  // 3-card soft strategy
+  if(n===3&&x.soft){
+    if(t<=18)return'H';
+    if(t===19)return[2,3,4,5,6,7,8].includes(d)?'S':'H';
+    if(t===20)return d==='A'?'H':'S';
+    return'S';
+  }
+
+  // 3-card hard strategy
+  if(n===3&&!x.soft){
+    if(t<=9)return'H';
+    if(t===10)return[3,4,5,6].includes(d)?'D':'H';
+    if(t===11)return[2,3,4,5,6].includes(d)?'D':'H';
+    if(t===12)return'H';
+    if(t===13)return[3,4,5,6].includes(d)?'S':'H';
+    if(t===14)return[2,3,4,5,6].includes(d)?'S':'H';
+    if(t===15)return[2,3,4,5,6].includes(d)?'S':'H';
+    if(t===16)return[2,3,4,5,6,9,10].includes(d)?'S':'H';
+    if(t===17)return d==='A'?'H':'S';
+    return'S';
+  }
+
+  // 2-card soft strategy
+  if(n===2&&x.soft){
+    if(t<=15)return'H';
+    if(t===16)return d===6?'D':'H';
+    if(t===17)return[5,6].includes(d)?'D':'H';
+    if(t===18){if([3,4,5,6].includes(d))return'D';if(d===7)return'S';return'H';}
+    return'S';
+  }
+
+  // 2-card hard strategy
+  if(n===2&&!x.soft){
+    if(t<=8)return'H';
+    if(t===9)return d===6?'D':'H';
+    if(t===10)return(d!=='A'&&d>=2&&d<=8)?'D':'H';
+    if(t===11)return d==='A'?'H':'D';
+    if(t===12)return[3,4,5,6].includes(d)?'S':'H';
+    if(t===13||t===14)return[2,3,4,5,6].includes(d)?'S':'H';
+    if(t===15)return[2,3,4,5,6,10].includes(d)?'S':'H';
+    if(t===16)return[2,3,4,5,6,9,10].includes(d)?'S':'H';
+    if(t===17)return d==='A'?'H':'S';
+    return'S';
+  }
+
+  // 5 cards <=21 should already auto-win before reaching strategy().
+  return t>=18?'S':'H';
+}
 const dealerBustApprox={2:.35,3:.37,4:.40,5:.42,6:.42,7:.26,8:.24,9:.23,10:.21,A:.12};
 function hitRisk(cs){const x=info(cs);if(x.soft||x.total<=11)return{rate:0,safe:['A','2','3','4','5','6','7','8','9','10/J/Q/K'],bust:[]};const vals=[['A',1,1],['2',2,1],['3',3,1],['4',4,1],['5',5,1],['6',6,1],['7',7,1],['8',8,1],['9',9,1],['10/J/Q/K',10,4]];let b=0,safe=[],bust=[];for(const [l,v,w] of vals){if(x.total+v>21){b+=w;bust.push(l)}else safe.push(l)}return{rate:b/13,safe,bust}}
 function cardHtml(c){return`<div class="pcard ${(c.s==='♥'||c.s==='♦')?'red':''}"><span>${c.r}</span><span style="font-size:22px;align-self:flex-end">${c.s}</span></div>`}
 function money(n){return'$'+n.toFixed(2)}
 function validActions(){if(!roundOpen||!hands[current]||hands[current].done)return[];const h=hands[current],o=['H','S'];if((h.cards.length===2||h.cards.length===3)&&stats.bankroll>=h.bet)o.push('D');if(h.cards.length===2&&pair(h.cards)&&splitCount<2&&stats.bankroll>=h.bet)o.push('P');return o}
 function updateStats(){const p=stats.bankroll-stats.startBankroll;els.bankroll.textContent=money(stats.bankroll);els.profit.textContent=(p>=0?'+':'')+money(p);els.roi.textContent=((p/stats.startBankroll)*100).toFixed(2)+'%';els.winRate.textContent=stats.hands?(stats.wins/stats.hands*100).toFixed(1)+'%':'—';els.accuracy.textContent=stats.decisions?(stats.correct/stats.decisions*100).toFixed(1)+'%':'—';els.wagered.textContent=money(stats.totalWagered);els.summary.textContent=`${stats.wins} 勝 / ${stats.losses} 負 / ${stats.hands} 手；策略正確 ${stats.correct}/${stats.decisions} 次。`}
-function explain(cs,d,opt){const x=info(cs),r=hitRisk(cs),db=dealerBustApprox[d]||0;let s=`目前 ${x.soft?'Soft':'Hard'} ${x.total}。Hit 一張立即爆牌率約 ${(r.rate*100).toFixed(1)}%；Dealer ${d} 最終爆牌率約 ${(db*100).toFixed(0)}%。`;if(cs.length===4)s+=' 你已有 4 張牌，下一張只要不爆就是 Five Card Trick 自動勝。';if(opt==='H')s+=' 建議 Hit：目前停牌競爭力不足，或成功補牌／第5張不爆的價值更高。';if(opt==='S')s+=' 建議 Stand：繼續補牌的立即死亡風險或改善價值，不如讓 Dealer 繼續完成牌。';if(opt==='D')s+=' 建議 Double：只拿一張就形成強牌的機率夠高，值得放大下注。';if(opt==='P')s+=' 建議 Split：拆成兩個新起點的期望值高於保留原手牌。';if((x.total===15||x.total===16)&&(d===9||d===10))s+=' 注意：同總點數對 Dealer 9 與 10，你自己的爆牌率相同；差別來自 Dealer 最終分布、平手玩家輸，以及你不爆後的17–20到底有多大價值。';return s}
+function explain(cs,d,opt){const x=info(cs),r=hitRisk(cs),db=dealerBustApprox[d]||0;let s=`目前 ${x.soft?'Soft':'Hard'} ${x.total}。Hit 一張立即爆牌率約 ${(r.rate*100).toFixed(1)}%；Dealer ${d} 最終爆牌率約 ${(db*100).toFixed(0)}%。`;if(cs.length===4)s+=' 你已有 4 張牌，下一張只要不爆就是 Five Card Trick 自動勝；若剛好到 21，則由 Player 21 規則立即勝。';if(opt==='H')s+=' 建議 Hit：目前停牌競爭力不足，或成功補牌／第5張不爆的價值更高。';if(opt==='S')s+=' 建議 Stand：繼續補牌的立即死亡風險或改善價值，不如讓 Dealer 繼續完成牌。';if(opt==='D')s+=' 建議 Double：只拿一張就形成強牌的機率夠高，值得放大下注。';if(opt==='P')s+=' 建議 Split：拆成兩個新起點的期望值高於保留原手牌。';if((x.total===15||x.total===16)&&(d===9||d===10))s+=' 注意：同總點數對 Dealer 9 與 10，你自己的爆牌率相同；差別來自 Dealer 最終分布、平手玩家輸，以及你不爆後的17–20到底有多大價值。';return s}
 
 // Monte Carlo：估算「現在選某動作，之後照策略自動玩」的結果。
 function takeSimCard(deck){return deck.pop()}
